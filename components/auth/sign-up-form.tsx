@@ -20,8 +20,11 @@ import { DEFAULT_PUBLIC_ACCOUNT_TYPE } from "@/lib/account-types";
 import type { ApplicationType } from "@/lib/application-types";
 import { createClient } from "@/lib/supabase/client";
 
-/** Where the confirmation email sends the user once their address is verified. */
-const AFTER_CONFIRMATION_PATH = "/dashboard";
+/** Where a signed-in applicant lands; also the confirmation email's target. */
+const SIGNED_IN_PATH = "/dashboard";
+
+/** Shown when the account exists but the email address still needs confirming. */
+const CONFIRMATION_PENDING_PATH = "/auth/sign-up-success";
 
 interface SignUpFormProps {
   /**
@@ -64,11 +67,11 @@ export function SignUpForm({
     // created on the first authenticated visit (see lib/profiles.ts), where
     // the account type is validated again server-side.
     const supabase = createClient();
-    const { error: signUpError } = await supabase.auth.signUp({
+    const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}${AFTER_CONFIRMATION_PATH}`,
+        emailRedirectTo: `${window.location.origin}${SIGNED_IN_PATH}`,
         data: {
           full_name: fullName.trim(),
           account_type: accountType,
@@ -82,7 +85,13 @@ export function SignUpForm({
       return;
     }
 
-    router.push("/auth/sign-up-success");
+    // Supabase decides what signUp() returns based on the project's "Confirm
+    // email" setting. With confirmation on, there is no session yet and the
+    // user must follow the emailed link; with it off, the user is signed in
+    // immediately and can go straight to the dashboard, where the profile is
+    // created from the same metadata on first visit. The session object is
+    // the only thing consulted here — no environment flags, no shortcuts.
+    router.push(data.session ? SIGNED_IN_PATH : CONFIRMATION_PENDING_PATH);
   }
 
   return (
@@ -90,7 +99,7 @@ export function SignUpForm({
       <CardHeader>
         <CardTitle>Create your account</CardTitle>
         <CardDescription>
-          You&apos;ll confirm your email, then start your application.
+          Create your account, then start your application.
         </CardDescription>
       </CardHeader>
       <CardContent>
