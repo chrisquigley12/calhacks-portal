@@ -22,7 +22,7 @@ export function OrganizerCallout() {
           </p>
         </div>
         <Button asChild variant="outline">
-          <Link href="/auth/login">Organizer sign in</Link>
+          <Link href="/auth/login?role=organizer">Organizer sign in</Link>
         </Button>
       </PageContainer>
     </section>

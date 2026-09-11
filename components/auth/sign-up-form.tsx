@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { AccountTypeSelector } from "@/components/auth/account-type-selector";
 import { FormError } from "@/components/auth/form-error";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,15 +16,29 @@ import {
 } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { DEFAULT_PUBLIC_ACCOUNT_TYPE } from "@/lib/account-types";
+import type { ApplicationType } from "@/lib/application-types";
 import { createClient } from "@/lib/supabase/client";
 
 /** Where the confirmation email sends the user once their address is verified. */
 const AFTER_CONFIRMATION_PATH = "/dashboard";
 
-export function SignUpForm() {
+interface SignUpFormProps {
+  /**
+   * Preselected account type, already validated by the page against the
+   * public allowlist. The user can still switch before submitting.
+   */
+  initialAccountType?: ApplicationType;
+}
+
+export function SignUpForm({
+  initialAccountType = DEFAULT_PUBLIC_ACCOUNT_TYPE,
+}: SignUpFormProps) {
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [accountType, setAccountType] = useState<ApplicationType>(initialAccountType);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
@@ -32,6 +47,11 @@ export function SignUpForm() {
     event.preventDefault();
     setError(null);
 
+    if (fullName.trim() === "") {
+      setError("Please enter your full name.");
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
       return;
@@ -39,12 +59,20 @@ export function SignUpForm() {
 
     setIsSubmitting(true);
 
+    // The name and account type are stored as auth user metadata so they
+    // survive the email-confirmation round trip. The profile row itself is
+    // created on the first authenticated visit (see lib/profiles.ts), where
+    // the account type is validated again server-side.
     const supabase = createClient();
     const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}${AFTER_CONFIRMATION_PATH}`,
+        data: {
+          full_name: fullName.trim(),
+          account_type: accountType,
+        },
       },
     });
 
@@ -67,6 +95,20 @@ export function SignUpForm() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <AccountTypeSelector value={accountType} onChange={setAccountType} />
+
+          <FormField id="full-name" label="Full name">
+            {(controlProps) => (
+              <Input
+                {...controlProps}
+                autoComplete="name"
+                required
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+              />
+            )}
+          </FormField>
+
           <FormField id="email" label="Email">
             {(controlProps) => (
               <Input

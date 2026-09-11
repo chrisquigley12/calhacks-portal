@@ -40,6 +40,6 @@ describe("LandingPage", () => {
 
     expect(
       screen.getByRole("link", { name: "Organizer sign in" }),
-    ).toHaveAttribute("href", "/auth/login");
+    ).toHaveAttribute("href", "/auth/login?role=organizer");
   });
 });

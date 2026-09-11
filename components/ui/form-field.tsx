@@ -51,7 +51,10 @@ export function FormField({ id, label, hint, error, children }: FormFieldProps) 
 
   return (
     <div className="flex flex-col gap-2">
-      <Label htmlFor={id}>{label}</Label>
+      {/* The label id lets grouped controls (checkbox groups) reference it via aria-labelledby. */}
+      <Label id={`${id}-label`} htmlFor={id}>
+        {label}
+      </Label>
       {children(controlProps)}
       {showHint && (
         <p id={hintId} className="text-sm text-muted-foreground">

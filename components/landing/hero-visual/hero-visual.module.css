@@ -1,0 +1,537 @@
+/*
+ * Ambient and entrance motion for the hero visual.
+ *
+ * Division of labour:
+ *   - CSS (this file): entrance choreography, slow ambient loops, and
+ *     300–600ms micro state transitions. These are compositor-friendly
+ *     (transform/opacity/stroke-dashoffset) and cost nothing on the main thread.
+ *   - JS (use-hero-scene.ts): the 16s application story, cursor parallax, and
+ *     node proximity. Those need per-frame coordination between elements.
+ *
+ * Colours come from the global design tokens: --foreground for linework,
+ * --primary for the Cal Hacks blue, --hero-gold for the single positive moment.
+ */
+
+.scene {
+  --px: 0px;
+  --py: 0px;
+  --ink: hsl(var(--foreground));
+  --blue: hsl(var(--primary));
+  --gold: hsl(var(--hero-gold));
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  position: relative;
+  width: 100%;
+  aspect-ratio: 640 / 600;
+  contain: layout paint;
+  container-type: inline-size;
+  user-select: none;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+  transform: translate3d(
+    calc(var(--px) * var(--depth)),
+    calc(var(--py) * var(--depth)),
+    0
+  );
+}
+
+.layer > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Parallax coefficients (multiples of a 10px cursor budget). */
+.atmosphere {
+  --depth: 0.15;
+}
+.palace {
+  --depth: 0.3;
+}
+.system {
+  --depth: 0.55;
+}
+.foreground {
+  --depth: 0.9;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Entrance choreography                                                       */
+/* ------------------------------------------------------------------------- */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.atmosphere {
+  animation: fade-in 0.9s ease-out both;
+}
+
+/* Every architectural path draws itself; --i staggers the start. */
+.palaceLine {
+  stroke-dasharray: 1 1;
+  animation: draw 1.4s cubic-bezier(0.65, 0, 0.25, 1) both;
+  animation-delay: calc(0.25s + var(--i, 0) * 0.09s);
+}
+
+.reflection {
+  animation: fade-in 1.2s ease-out 1.3s both;
+}
+
+.core {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pop-in 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) 1.05s both;
+}
+
+.routeLine,
+.orbitLine {
+  stroke-dasharray: 1 1;
+  animation: draw 0.9s cubic-bezier(0.65, 0, 0.25, 1) both;
+  animation-delay: calc(1.2s + var(--i, 0) * 0.12s);
+}
+
+.innerOrbit {
+  animation: fade-in 1s ease-out 1.5s both;
+}
+
+.node,
+.fragment {
+  animation: rise-in 0.5s ease-out both;
+  animation-delay: calc(1.65s + var(--i, 0) * 0.1s);
+}
+
+.foreground {
+  animation: fade-in 1.2s ease-out 1.9s both;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Ambient loops                                                               */
+/* ------------------------------------------------------------------------- */
+
+@keyframes breathe {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.012);
+  }
+}
+
+@keyframes drift-dash {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -64;
+  }
+}
+
+@keyframes float-a {
+  from {
+    transform: translateY(-5px);
+  }
+  to {
+    transform: translateY(5px);
+  }
+}
+
+@keyframes float-b {
+  from {
+    transform: translate(3px, 6px);
+  }
+  to {
+    transform: translate(-3px, -6px);
+  }
+}
+
+@keyframes pearl-idle {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.palaceBreath {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: breathe 20s ease-in-out infinite alternate;
+}
+
+.innerOrbitDash {
+  animation: drift-dash 14s linear infinite;
+}
+
+.floatA {
+  animation: float-a 8s ease-in-out infinite alternate;
+}
+.floatB {
+  animation: float-b 9.5s ease-in-out infinite alternate;
+}
+.floatC {
+  animation: float-a 6.5s ease-in-out infinite alternate-reverse;
+}
+
+.pearlRing {
+  animation: pearl-idle 4.5s ease-in-out infinite;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Static styling + micro state transitions                                    */
+/* ------------------------------------------------------------------------- */
+
+.line {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  fill: var(--ink);
+}
+
+/* Route base lines brighten while the token travels them (set by JS). */
+.routeLine {
+  opacity: calc(0.22 + var(--active, 0) * 0.55);
+  transition: opacity 0.3s ease;
+}
+
+/* Trailing highlight that follows the token along a route. */
+.routeGlow {
+  stroke: var(--blue);
+  stroke-width: 1.6;
+  stroke-dasharray: 0.14 1;
+  opacity: 0;
+}
+
+/* Nodes: proximity (--near) and one-shot pulses (--pulse) both come from JS. */
+.node {
+  --near: 0;
+  --pulse: 0;
+}
+
+.nodeRing {
+  fill: none;
+  stroke: var(--ink);
+  stroke-opacity: calc(0.36 + var(--near) * 0.4 + var(--pulse) * 0.5);
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(calc(1 + var(--near) * 0.12 + var(--pulse) * 0.35));
+  transition:
+    transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
+    stroke-opacity 0.3s ease;
+}
+
+.nodeDot {
+  fill: var(--ink);
+  fill-opacity: calc(0.68 + var(--near) * 0.32);
+  transition: fill-opacity 0.3s ease;
+}
+
+.nodeDot[data-tone="blue"] {
+  fill: var(--blue);
+}
+
+.nodeLabel {
+  opacity: calc(0.74 + var(--near) * 0.26);
+  transition: opacity 0.3s ease;
+}
+
+/* Secondary detail label revealed only when the cursor approaches. */
+.nodeDetail {
+  opacity: calc(var(--near) * 0.85);
+  transform: translateY(calc((1 - var(--near)) * 3px));
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease;
+}
+
+/* The three review indicators fill as the score resolves. */
+.reviewDot {
+  fill: var(--ink);
+  fill-opacity: 0.18;
+  transition:
+    fill-opacity 0.35s ease,
+    fill 0.35s ease;
+}
+[data-review="1"] .reviewDot:nth-of-type(1),
+[data-review="2"] .reviewDot:nth-of-type(-n + 2),
+[data-review="3"] .reviewDot {
+  fill: var(--blue);
+  fill-opacity: 1;
+}
+
+/* Core pearl: base is neutral; JS raises --lit as applications pass through. */
+.core {
+  --lit: 0;
+  --pulse: 0;
+  --near: 0;
+}
+
+.pearlGlow {
+  fill: var(--blue);
+  opacity: calc(var(--lit) * 0.22 + var(--pulse) * 0.18);
+}
+
+.pearlHalo {
+  fill: none;
+  stroke: var(--blue);
+  stroke-opacity: calc(var(--lit) * 0.55 + var(--pulse) * 0.35);
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(calc(1 + var(--pulse) * 0.6 + var(--near) * 0.1));
+}
+
+.pearl {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(calc(1 + var(--pulse) * 0.18));
+}
+
+.goldRing {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 0.9;
+  opacity: 0;
+}
+
+/* The core label is the identity anchor of the whole composition. */
+.coreLabel {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+}
+
+/* Application token. Status colour transitions in ~400ms. */
+.token {
+  opacity: 0;
+}
+
+.tokenBody {
+  --tk-scale: 1;
+  --tk-shift: 0px;
+  transform-origin: 0 0;
+  transform: scale(var(--tk-scale)) translateX(var(--tk-shift));
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Near the right edge the card swings to the left of its anchor so it
+   stays inside the frame (the JS sets data-side). */
+.token[data-side="left"] .tokenBody {
+  --tk-shift: -126px;
+}
+.token[data-side="left"] .tokenStem {
+  opacity: 0;
+}
+
+.tokenCard {
+  fill: hsl(var(--background));
+  stroke: hsl(var(--border));
+  stroke-width: 1;
+}
+
+.tokenName {
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  fill: var(--ink);
+}
+
+.tokenStatus {
+  font-family: var(--mono);
+  font-size: 6.6px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  fill: hsl(var(--muted-foreground));
+  transition: fill 0.4s ease;
+}
+
+.tokenCheck {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  transition:
+    stroke-dashoffset 0.45s cubic-bezier(0.65, 0, 0.25, 1) 0.1s,
+    stroke 0.4s ease;
+}
+
+.tokenAccent {
+  fill: var(--blue);
+  opacity: 0;
+  transition:
+    opacity 0.4s ease,
+    fill 0.4s ease;
+}
+
+.tokenAnchor {
+  fill: var(--blue);
+  transition: fill 0.4s ease;
+}
+
+.token[data-status="submitted"] .tokenCheck,
+.token[data-status="accepted"] .tokenCheck {
+  stroke-dashoffset: 0;
+}
+.token[data-status="submitted"] .tokenStatus,
+.token[data-status="in-review"] .tokenStatus {
+  fill: var(--blue);
+}
+.token[data-status="in-review"] .tokenAccent,
+.token[data-status="complete"] .tokenAccent {
+  opacity: 1;
+}
+.token[data-status="accepted"] .tokenStatus,
+.token[data-status="accepted"] .tokenAnchor {
+  fill: var(--gold);
+}
+.token[data-status="accepted"] .tokenCheck {
+  stroke: var(--gold);
+}
+.token[data-status="accepted"] .tokenCard {
+  stroke: var(--gold);
+}
+
+/* Palace "lighting" overlays: blue duplicates of key arches, faded by JS. */
+.palaceLit {
+  stroke: var(--blue);
+  stroke-width: 1.2;
+  opacity: 0;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Compact (mobile) variant                                                    */
+/* ------------------------------------------------------------------------- */
+
+.compact {
+  aspect-ratio: 616 / 460;
+}
+
+.compact .foreground,
+.compact .reflection,
+.compact .dotGrid,
+.compact .nodeDetail,
+.compact .corner,
+.compact .fragment {
+  display: none;
+}
+
+.compact .layer {
+  transform: none;
+}
+
+/* Small screens: fewer words, but the words that remain must be legible. */
+.compact .nodeLabel,
+.compact [data-el="score"] {
+  font-size: 10.5px;
+}
+.compact .coreLabel {
+  font-size: 12.5px;
+}
+
+.compact [data-el="review-dots"] {
+  display: none;
+}
+
+.compact .tokenBody {
+  --tk-scale: 1.3;
+}
+
+/* Narrow desktop columns (≈1024px viewports): nudge the type up a step. */
+@container (max-width: 440px) {
+  .scene:not(.compact) .nodeLabel,
+  .scene:not(.compact) [data-el="score"] {
+    font-size: 10.5px;
+  }
+  .scene:not(.compact) .tokenBody {
+    --tk-scale: 1.18;
+  }
+}
+
+/* ------------------------------------------------------------------------- */
+/* Reduced motion: present the final, resolved composition, no animation.     */
+/* ------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .scene *,
+  .scene {
+    animation: none !important;
+    transition: none !important;
+  }
+  .palaceLine,
+  .routeLine,
+  .orbitLine {
+    stroke-dashoffset: 0;
+  }
+  .layer {
+    transform: none;
+  }
+}
+
+.scene[data-static] *,
+.scene[data-static] {
+  animation: none !important;
+  transition: none !important;
+}
+.scene[data-static] .palaceLine,
+.scene[data-static] .routeLine,
+.scene[data-static] .orbitLine {
+  stroke-dashoffset: 0;
+}

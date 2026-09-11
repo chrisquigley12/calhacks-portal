@@ -46,6 +46,12 @@
     --input: 240 6% 86%;
     --ring: 220 70% 50%;
 
+    /*
+     * Warm Cal gold. Reserved for the hero visual's single positive moment
+     * (an application being accepted); not a general-purpose accent.
+     */
+    --hero-gold: 41 72% 47%;
+
     --radius: 0.5rem;
   }
 }

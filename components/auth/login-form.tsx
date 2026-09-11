@@ -17,10 +17,26 @@ import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 
-/** Where a user lands after signing in. */
-const AFTER_LOGIN_PATH = "/dashboard";
+/**
+ * Which sign-in experience to show. This only changes copy and where the
+ * browser is sent after a successful sign-in. It grants nothing: /organizer
+ * verifies profiles.account_type on the server and bounces anyone else to
+ * /dashboard, so an applicant using organizer mode ends up on their own
+ * dashboard.
+ */
+export type LoginMode = "applicant" | "organizer";
 
-export function LoginForm() {
+/** Fixed allowlist of post-login destinations; never read from the URL. */
+const DESTINATION_BY_MODE: Record<LoginMode, string> = {
+  applicant: "/dashboard",
+  organizer: "/organizer",
+};
+
+interface LoginFormProps {
+  mode?: LoginMode;
+}
+
+export function LoginForm({ mode = "applicant" }: LoginFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -44,15 +60,17 @@ export function LoginForm() {
       return;
     }
 
-    router.push(AFTER_LOGIN_PATH);
+    router.push(DESTINATION_BY_MODE[mode]);
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Sign in</CardTitle>
+        <CardTitle>{mode === "organizer" ? "Organizer sign in" : "Sign in"}</CardTitle>
         <CardDescription>
-          Use the email and password you signed up with.
+          {mode === "organizer"
+            ? "Sign in with your Cal Hacks organizer account."
+            : "Use the email and password you signed up with."}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -96,15 +114,19 @@ export function LoginForm() {
             >
               Forgot your password?
             </Link>
-            <p>
-              New here?{" "}
-              <Link
-                href="/auth/sign-up"
-                className="font-medium text-foreground underline-offset-4 hover:underline"
-              >
-                Create an account
-              </Link>
-            </p>
+            {mode === "organizer" ? (
+              <p>Organizer accounts are provisioned by the Cal Hacks team.</p>
+            ) : (
+              <p>
+                New here?{" "}
+                <Link
+                  href="/auth/sign-up"
+                  className="font-medium text-foreground underline-offset-4 hover:underline"
+                >
+                  Create an account
+                </Link>
+              </p>
+            )}
           </div>
         </form>
       </CardContent>
