@@ -1,20 +1,35 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+
 import { hasEnvVars } from "../utils";
 
+/**
+ * Routes that can be visited without signing in. Everything else redirects
+ * to the sign-in page. Pages themselves still verify the user server-side
+ * where it matters; this proxy is a convenience, not the security boundary.
+ */
+function isPublicPath(pathname: string): boolean {
+  return pathname === "/" || pathname.startsWith("/auth");
+}
+
+/**
+ * Runs on every request (see proxy.ts at the project root). It refreshes the
+ * Supabase session cookie so server components always see a valid session,
+ * and redirects signed-out visitors away from protected pages.
+ */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   });
 
-  // If the env vars are not set, skip proxy check. You can remove this
-  // once you setup the project.
+  // In an environment without Supabase configured, serve pages without
+  // touching auth rather than failing every request.
   if (!hasEnvVars) {
     return supabaseResponse;
   }
 
-  // With Fluid compute, don't put this client in a global environment
-  // variable. Always create a new one on each request.
+  // Always create a fresh client per request; sharing one across requests
+  // would leak cookies between users.
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
@@ -38,39 +53,19 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // Do not run code between createServerClient and
-  // supabase.auth.getClaims(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
-  // IMPORTANT: If you remove getClaims() and you use server-side rendering
-  // with the Supabase client, your users may be randomly logged out.
+  // IMPORTANT: Do not run code between createServerClient and getClaims().
+  // getClaims() is what refreshes the session; skipping it can randomly sign
+  // users out when server components later read the session.
   const { data } = await supabase.auth.getClaims();
   const user = data?.claims;
 
-  if (
-    request.nextUrl.pathname !== "/" &&
-    !user &&
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/auth")
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
+  if (!user && !isPublicPath(request.nextUrl.pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
     return NextResponse.redirect(url);
   }
 
-  // IMPORTANT: You *must* return the supabaseResponse object as it is.
-  // If you're creating a new response object with NextResponse.next() make sure to:
-  // 1. Pass the request in it, like so:
-  //    const myNewResponse = NextResponse.next({ request })
-  // 2. Copy over the cookies, like so:
-  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
-  // 3. Change the myNewResponse object to fit your needs, but avoid changing
-  //    the cookies!
-  // 4. Finally:
-  //    return myNewResponse
-  // If this is not done, you may be causing the browser and server to go out
-  // of sync and terminate the user's session prematurely!
-
+  // IMPORTANT: Return supabaseResponse as-is. Creating a new response without
+  // copying its cookies would desync the browser and server sessions.
   return supabaseResponse;
 }

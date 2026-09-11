@@ -10,6 +10,8 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  // Generated and third-party code is not ours to lint.
+  { ignores: [".next/**", "node_modules/**", "coverage/**"] },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 ];
 

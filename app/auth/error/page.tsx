@@ -1,51 +1,50 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 
-async function ErrorContent({
-  searchParams,
-}: {
-  searchParams: Promise<{ error: string }>;
-}) {
-  const params = await searchParams;
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
+export const metadata: Metadata = { title: "Something went wrong" };
+
+type ErrorPageProps = {
+  searchParams: Promise<{ error?: string }>;
+};
+
+// Reading searchParams is dynamic, so it lives in its own component behind
+// Suspense; the surrounding card can still be rendered statically.
+async function ErrorDetails({ searchParams }: ErrorPageProps) {
+  const params = await searchParams;
   return (
-    <>
-      {params?.error ? (
-        <p className="text-sm text-muted-foreground">
-          Code error: {params.error}
-        </p>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          An unspecified error occurred.
-        </p>
-      )}
-    </>
+    <p className="text-sm text-muted-foreground">
+      {params.error ? `Details: ${params.error}` : "An unspecified error occurred."}
+    </p>
   );
 }
 
-export default function Page({
-  searchParams,
-}: {
-  searchParams: Promise<{ error: string }>;
-}) {
+export default function AuthErrorPage({ searchParams }: ErrorPageProps) {
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-      <div className="w-full max-w-sm">
-        <div className="flex flex-col gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl">
-                Sorry, something went wrong.
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Suspense>
-                <ErrorContent searchParams={searchParams} />
-              </Suspense>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Something went wrong</CardTitle>
+        <CardDescription>
+          We couldn&apos;t complete that request. Try again, or sign in.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-6">
+        <Suspense>
+          <ErrorDetails searchParams={searchParams} />
+        </Suspense>
+        <Button asChild variant="outline">
+          <Link href="/auth/login">Back to sign in</Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

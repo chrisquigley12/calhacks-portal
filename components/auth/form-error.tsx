@@ -1,0 +1,22 @@
+interface FormErrorProps {
+  message: string | null;
+}
+
+/**
+ * Form-level error (as opposed to a single field's error). `role="alert"`
+ * makes screen readers announce it as soon as it appears.
+ */
+export function FormError({ message }: FormErrorProps) {
+  if (!message) {
+    return null;
+  }
+
+  return (
+    <p
+      role="alert"
+      className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+    >
+      {message}
+    </p>
+  );
+}
